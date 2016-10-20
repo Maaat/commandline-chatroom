@@ -39,5 +39,5 @@ while True:
 
 			#or the connection has been closed
 			except ConnectionResetError:
-				handleMessage("A client disconnected.")
 				clients.remove(connection)
+				handleMessage("A client disconnected.")
