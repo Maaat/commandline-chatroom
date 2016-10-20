@@ -5,7 +5,7 @@ import select
 clients = set();
 
 def handleMessage(message):
-	print(message)
+	print('>'+message)
 	for client in clients:
 		client.send(('>'+message).encode('utf-8'))
 
@@ -34,7 +34,6 @@ while True:
 				message = connection.recv(1024).decode('utf-8')
 				if message == 'exit':
 					raise ConnectionResetError()
-				print(">" + message)
 				handleMessage(message)
 
 			#or the connection has been closed

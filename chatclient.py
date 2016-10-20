@@ -1,3 +1,4 @@
+import sys
 import socket
 import threading
 import select
@@ -18,7 +19,7 @@ def receiveLoop(connection):
 exiting = False
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serverAddress = ('127.0.0.1',8080)
+serverAddress = (sys.argv[1], int(sys.argv[2]))
 
 print("Connecting to server...")
 server.connect(serverAddress)
