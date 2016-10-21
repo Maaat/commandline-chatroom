@@ -7,48 +7,50 @@ import socket
 import threading
 import select
 
-#method to wait for and handle messages from the server
-def receiveLoop(connection):
+serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+#connects to the server
+def connectToServer(serverAddress, serverPort):
+	print("Connecting to server...")
+	serverAddress = (serverAddress, serverPort)
+	serverSocket.connect(serverAddress)
+	print("Connected.")
+
+#continuously waits for and handles messages from the server
+def handleServerInput():
 	while True:
 		try:
-			(readable, writable, errored) = select.select([connection], [], [connection], 0.1)
+			(readable, writable, errored) = select.select([serverSocket], [], [serverSocket], 0.1)
 			if readable or errored:
-				message = connection.recv(1024).decode('utf-8')
+				message = serverSocket.recv(1024).decode('utf-8')
 				if message:
 					print(message)
 				else: break
 		except: break
 	print("Disconnected.")
 
-#runs the client
-def runClient(serverAddress, serverPort):
-
-	#define server to connect to
-	serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	serverAddress = (serverAddress, serverPort)
-
-	#connect to the server
-	print("Connecting to server...")
-	serverSocket.connect(serverAddress)
-	print("Connected.")
-
-	#receive messages from the server in a thread separate from the user input thread
-	receiveThread = threading.Thread(target=receiveLoop, args=[serverSocket])
-	receiveThread.start()
-
-	#receive user input
+#continuously prompts for user input and then sends it to the server
+def handleUserInput():
 	while True:
 		message = input()
 
 		#exit if the user types 'exit'
 		if message == 'exit':
 			serverSocket.close()
-			receiveThread.join()
 			break
 			
 		#otherwise send the message to the server
 		else:
 			serverSocket.send(message.encode('utf-8'))
+
+#runs the client
+def runClient(serverAddress, serverPort):
+
+	connectToServer(serverAddress, serverPort)
+
+	#handle server and user input in separate threads
+	threading.Thread(target=handleServerInput).start()
+	threading.Thread(target=handleUserInput).start()
 
 if __name__ == "__main__":
 	#this script needs 2 arguments

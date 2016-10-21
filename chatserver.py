@@ -11,23 +11,18 @@ log = open('log.txt', 'a+')
 #set of connected clients
 clients = set();
 
-#writes the message to a file and sends the message to all clients
-def handleMessage(message):
-	log.write('>'+message+"\n")
-	log.flush()
-	print('>'+message)
-	for client in clients:
-		client.send(('>'+message).encode('utf-8'))
+#server socket
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-#runs the server
-def runServer():
-
+#initial server setup
+def startServer():
 	#set up the listening socket
-	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.bind(('0.0.0.0', 8080))
 	server.listen(10)
 	print("The server has started.")
 
+#continuously handles inputs from clients as longt as the server runs
+def handleInputs():
 	#accept connections in a loop
 	while True:
 		#wait for input
@@ -54,6 +49,19 @@ def runServer():
 				except ConnectionError:
 					clients.remove(connection)
 					handleMessage("A client disconnected.")
+
+#writes the message to a file and sends the message to all clients
+def handleMessage(message):
+	log.write('>'+message+"\n")
+	log.flush()
+	print('>'+message)
+	for client in clients:
+		client.send(('>'+message).encode('utf-8'))
+
+#runs the server
+def runServer():
+	startServer()
+	handleInputs()
 
 if __name__ == "__main__":
 	runServer()
