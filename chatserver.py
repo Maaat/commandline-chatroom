@@ -1,42 +1,59 @@
+#File: chatserver.py
+#Author: Mathew Poff
+#Description: server script to host a chat room.
+
 import socket
 import select
+
+#open log file
+log = open('log.txt', 'a+')
 
 #set of connected clients
 clients = set();
 
+#writes the message to a file and sends the message to all clients
 def handleMessage(message):
+	log.write('>'+message+"\n")
+	log.flush()
 	print('>'+message)
 	for client in clients:
 		client.send(('>'+message).encode('utf-8'))
 
-#set up the listening socket
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(('0.0.0.0', 8080))
-server.listen(10)
-print("The server has started.")
+#runs the server
+def runServer():
 
-#accept connections in a loop
-while True:
-	#wait for input
-	(readable, writable, errored) = select.select([server] + list(clients), [], [])
+	#set up the listening socket
+	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	server.bind(('0.0.0.0', 8080))
+	server.listen(10)
+	print("The server has started.")
 
-	for connection in readable:
-		#the connection being the main socket means that there is a new client
-		if connection == server:
-			handleMessage("A client joined.")
-			(connection, address) = server.accept()
-			clients.add(connection)
+	#accept connections in a loop
+	while True:
+		#wait for input
+		(readable, writable, errored) = select.select([server] + list(clients), [], [])
 
-		else:
+		for connection in readable:
+			#the connection being the main socket means that there is a new client
+			if connection == server:
+				handleMessage("A client joined.")
+				(connection, address) = server.accept()
+				clients.add(connection)
 
-			#otherwise it is a new message
-			try:
-				message = connection.recv(1024).decode('utf-8')
-				if message == 'exit':
-					raise ConnectionResetError()
-				handleMessage(message)
+			else:
 
-			#or the connection has been closed
-			except ConnectionResetError:
-				clients.remove(connection)
-				handleMessage("A client disconnected.")
+				#otherwise it is a new message
+				try:
+					message = connection.recv(1024).decode('utf-8')
+					if not message:
+						raise ConnectionError()
+					else:
+						handleMessage(message)
+
+				#or the connection has been closed
+				except ConnectionError:
+					clients.remove(connection)
+					handleMessage("A client disconnected.")
+
+if __name__ == "__main__":
+	runServer()
