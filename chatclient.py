@@ -10,10 +10,11 @@ import select
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 #connects to the server
-def connectToServer(serverAddress, serverPort):
+def connectToServer(serverAddress, serverPort, username):
 	print("Connecting to server...")
 	serverAddress = (serverAddress, serverPort)
 	serverSocket.connect(serverAddress)
+	serverSocket.send(("/name:"+username).encode('utf-8'))
 	print("Connected.")
 
 #continuously waits for and handles messages from the server
@@ -46,7 +47,9 @@ def handleUserInput():
 #runs the client
 def runClient(serverAddress, serverPort):
 
-	connectToServer(serverAddress, serverPort)
+	username = input("Enter your name:")
+
+	connectToServer(serverAddress, serverPort, username)
 
 	#handle server and user input in separate threads
 	threading.Thread(target=handleServerInput).start()
