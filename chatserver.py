@@ -2,129 +2,138 @@
 #Author: Mathew Poff
 #Description: server script to host a chat room.
 
+import sys
 import socket
 import select
 import sqlalchemy
 
-#connect to db
-db = sqlalchemy.create_engine('sqlite:///chatroom.db')
-dbConn = db.connect()
+class ChatServer():
 
-#turn off db logging
-db.echo = False
+	#constructor
+	def __init__(self):
 
-#set up the db if it wasn't already there
-dbMessages = sqlalchemy.Table('messages', sqlalchemy.MetaData(db),
-	sqlalchemy.Column('username',sqlalchemy.String(50)),
-	sqlalchemy.Column('message',sqlalchemy.String(200))
-)
-if not db.engine.dialect.has_table(db, 'messages'):
-	dbMessages.create()
+		#connect to db
+		self.db = sqlalchemy.create_engine('sqlite:///chatroom.db')
+		self.dbConn = self.db.connect()
 
-messagesResult = dbConn.execute(sqlalchemy.select([dbMessages]))
-messageLog = {'text':""}
-for row in messagesResult:
-	if row['username']: messageLog['text'] += row['username'] + '>'
-	messageLog['text'] += row['message'] + '\n'
+		#turn off db logging
+		self.db.echo = False
 
-print(messageLog['text'])
+		#set up the db if it wasn't already there
+		self.dbMessages = sqlalchemy.Table('messages', sqlalchemy.MetaData(self.db),
+			sqlalchemy.Column('username',sqlalchemy.String(50)),
+			sqlalchemy.Column('message',sqlalchemy.String(200))
+		)
+		if not self.db.engine.dialect.has_table(self.db, 'messages'):
+			self.dbMessages.create()
 
-#open log file
-logfile = open('log.txt', 'a+')
+		messagesResult = self.dbConn.execute(sqlalchemy.select([self.dbMessages]))
+		self.messageLog = ""
+		for row in messagesResult:
+			if row['username']: self.messageLog += row['username'] + '>'
+			self.messageLog += row['message'] + '\n'
 
-#set of connected clients
-clients = set()
-clientNames = {}
+		print(self.messageLog)
 
-#server socket
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		#open log file
+		self.logfile = open('log.txt', 'a+')
 
-#initial server setup
-def startServer():
-	#set up the listening socket
-	server.bind(('0.0.0.0', 8080))
-	server.listen(10)
-	print("The server has started.")
+		#set of connected clients
+		self.clients = set()
+		self.clientNames = {}
 
-#continuously handles inputs from clients as longt as the server runs
-def handleInputs():
-	#accept connections in a loop
-	while True:
-		#wait for input
-		(readable, writable, errored) = select.select([server] + list(clients), [], [])
+		#server socket
+		self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-		for connection in readable:
-			#the connection being the main socket means that there is a new client
-			if connection == server:
-				(connection, address) = server.accept()
-				connection.send(messageLog['text'].encode('utf-8'))
-				clients.add(connection)
+	#initial server setup
+	def startServer(self, port):
+		#set up the listening socket
+		self.serverSocket.bind(('0.0.0.0', port))
+		self.serverSocket.listen(10)
+		print("The server has started.")
 
-			else:
+	#continuously handles inputs from clients as long as the server runs
+	def handleInputs(self):
+		#accept connections in a loop
+		while True:
+			#wait for input
+			(readable, writable, errored) = select.select([self.serverSocket] + list(self.clients), [], [])
 
-				#otherwise it is a new message from a client
-				try:
-					if not connection:
-						raise ConnectionError()
-					handleClientMessage(connection)
+			for connection in readable:
+				#the connection being the main socket means that there is a new client
+				if connection == self.serverSocket:
+					(connection, address) = self.serverSocket.accept()
+					connection.send(self.messageLog.encode('utf-8'))
+					self.clients.add(connection)
 
-				#or the connection has been closed
-				except ConnectionError:
-					clients.remove(connection)
-					broadcast(clientNames[connection]+" disconnected.")
+				else:
 
-#broadcast a message from the server
-def broadcast(message):
+					#otherwise it is a new message from a client
+					try:
+						if not connection:
+							raise ConnectionError()
+						self.handleClientMessage(connection)
 
-	#print to server terminal
-	print(message)
+					#or the connection has been closed
+					except ConnectionError:
+						self.clients.remove(connection)
+						self.broadcast(self.clientNames[connection]+" disconnected.")
 
-	#insert the message into teh database
-	dbConn.execute( dbMessages.insert().values(username=None, message=message) )
+	#broadcast a message from the server
+	def broadcast(self, message):
 
-	#append to memory log
-	messageLog['text'] += message + '\n'
+		#print to server terminal
+		print(message)
 
-	#write to text log
-	logfile.write(message+"\n")
-	logfile.flush()
+		#insert the message into the database
+		self.dbConn.execute( self.dbMessages.insert().values(username=None, message=message) )
 
-	#send to clients
-	for client in clients:
-		client.send((message).encode('utf-8'))
+		#append to memory log
+		self.messageLog += message + '\n'
 
-#writes the message to a file and the database and sends the message to all clients
-def handleClientMessage(client):
+		#write to text log
+		self.logfile.write(message+"\n")
+		self.logfile.flush()
 
-	#client sent a message
-	message = client.recv(1024).decode('utf-8')
+		#send to clients
+		for client in self.clients:
+			client.send((message).encode('utf-8'))
 
-	#check if the user is setting their name
-	if message.startswith("/name:") and not hasattr(client, 'username'):
-		#set username
-		clientNames[client] = message.split("/name:")[1]
-		broadcast(clientNames[client]+" has joined.")
-		return
+	#writes the message to a file and the database and sends the message to all clients
+	def handleClientMessage(self, client):
 
-	signedMessage = clientNames[client]+'>'+message
+		#client sent a message
+		message = client.recv(1024).decode('utf-8')
 
-	#insert the message into the database
-	dbConn.execute(dbMessages.insert().values(username=clientNames[client], message=message))
+		#do not allow empty meessages
+		if not message or not message.strip(): raise ConnectionError()
 
-	#append to memory log
-	messageLog['text'] += signedMessage + '\n'
+		#check if the user is setting their name
+		if message.startswith("/name:") and not hasattr(client, 'username'):
+			#set username
+			self.clientNames[client] = message.split("/name:")[1]
+			self.broadcast(self.clientNames[client]+" has joined.")
+			return
 
-	#write to text log
-	logfile.write(signedMessage+"\n")
-	logfile.flush()
-	print(signedMessage)
-	for client in clients:
-		client.send((signedMessage).encode('utf-8'))
+		signedMessage = self.clientNames[client]+'>'+message
 
-#runs the server
-def runServer():
-	startServer()
-	handleInputs()
+		#insert the message into the database
+		self.dbConn.execute(self.dbMessages.insert().values(username=self.clientNames[client], message=message))
+
+		#append to memory log
+		self.messageLog += signedMessage + '\n'
+
+		#write to text log
+		self.logfile.write(signedMessage+"\n")
+		self.logfile.flush()
+		print(signedMessage)
+		for client in self.clients:
+			client.send((signedMessage).encode('utf-8'))
+
+	#runs the server
+	def runServer(self, port):
+		self.startServer(port)
+		self.handleInputs()
 
 if __name__ == "__main__":
-	runServer()
+	ChatServer().runServer(8080)

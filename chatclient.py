@@ -7,58 +7,65 @@ import socket
 import threading
 import select
 
-serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+class ChatClient():
 
-#connects to the server
-def connectToServer(serverAddress, serverPort, username):
-	print("Connecting to server...")
-	serverAddress = (serverAddress, serverPort)
-	serverSocket.connect(serverAddress)
-	serverSocket.send(("/name:"+username).encode('utf-8'))
-	print("Connected.")
+	#constructor
+	def __init__(self):
+		self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-#continuously waits for and handles messages from the server
-def handleServerInput():
-	while True:
-		try:
-			(readable, writable, errored) = select.select([serverSocket], [], [serverSocket], 0.1)
-			if readable or errored:
-				message = serverSocket.recv(1024).decode('utf-8')
-				if message:
-					print(message)
-				else: break
-		except: break
-	print("Disconnected.")
+	#connects to the server
+	def connectToServer(self, serverAddress, serverPort, username):
+		print("Connecting to server...")
+		serverAddress = (serverAddress, serverPort)
+		self.serverSocket.connect(serverAddress)
+		self.serverSocket.send(("/name:"+username).encode('utf-8'))
+		print("Connected.")
 
-#continuously prompts for user input and then sends it to the server
-def handleUserInput():
-	while True:
-		message = input()
+	#continuously waits for and handles messages from the server
+	def handleServerInput(self):
+		while True:
+			try:
+				(readable, writable, errored) = select.select([self.serverSocket], [], [self.serverSocket], 0.1)
+				if readable or errored:
+					message = self.serverSocket.recv(1024).decode('utf-8')
+					if message:
+						print(message)
+					else: break
+			except: break
+		print("Disconnected.")
 
-		#exit if the user types 'exit'
-		if message == 'exit':
-			serverSocket.close()
-			break
-			
-		#otherwise send the message to the server
-		else:
-			serverSocket.send(message.encode('utf-8'))
+	#continuously prompts for user input and then sends it to the server
+	def handleUserInput(self):
+		while True:
+			message = input()
 
-#runs the client
-def runClient(serverAddress, serverPort):
+			#exit if the user types 'exit'
+			if message == 'exit':
+				self.serverSocket.close()
+				break
+				
+			#otherwise send the message to the server
+			else:
+				self.serverSocket.send(message.encode('utf-8'))
 
-	username = input("Enter your name:")
+	#runs the client
+	def runClient(self, serverAddress, serverPort):
 
-	connectToServer(serverAddress, serverPort, username)
+		username = input("Enter your name:")
 
-	#handle server and user input in separate threads
-	threading.Thread(target=handleServerInput).start()
-	threading.Thread(target=handleUserInput).start()
+		self.connectToServer(serverAddress, serverPort, username)
+
+		#handle server and user input in separate threads
+		threading.Thread(target=self.handleServerInput).start()
+		threading.Thread(target=self.handleUserInput).start()
 
 if __name__ == "__main__":
-	#this script needs 2 arguments
-	if(len(sys.argv) < 3) :
-		print('Usage : python chatclient.py hostname port')
+	#new ChatClient
+	client = ChatClient()
+
+	#this script needs 1 argument
+	if(len(sys.argv) < 2) :
+		print('Usage : python chatclient.py hostname')
 		sys.exit()
 
-	runClient(sys.argv[1], int(sys.argv[2]))
+	client.runClient(sys.argv[1], 8080)
