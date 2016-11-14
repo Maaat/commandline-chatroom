@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
 	#this script needs 1 argument
 	if(len(sys.argv) < 2) :
-		print('Usage : python chatclient.py hostname')
+		print('Usage : python chatclient.py hostnameOrAddress')
 		sys.exit()
 
 	client.runClient(sys.argv[1], 8080)
