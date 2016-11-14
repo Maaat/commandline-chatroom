@@ -50,15 +50,14 @@ class ChatClient():
 
 	#runs the client
 	def runClient(self, serverAddress, serverPort):
-
 		username = input("Enter your name:")
-
 		self.connectToServer(serverAddress, serverPort, username)
 
 		#handle server and user input in separate threads
 		threading.Thread(target=self.handleServerInput).start()
 		threading.Thread(target=self.handleUserInput).start()
 
+#entry point
 if __name__ == "__main__":
 	#new ChatClient
 	client = ChatClient()

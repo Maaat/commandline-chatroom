@@ -11,7 +11,6 @@ class ChatServer():
 
 	#constructor
 	def __init__(self):
-
 		#connect to db
 		self.db = sqlalchemy.create_engine('sqlite:///chatroom.db')
 		self.dbConn = self.db.connect()
@@ -27,12 +26,16 @@ class ChatServer():
 		if not self.db.engine.dialect.has_table(self.db, 'messages'):
 			self.dbMessages.create()
 
+		#get message log from the database
 		messagesResult = self.dbConn.execute(sqlalchemy.select([self.dbMessages]))
+
+		#turn the message log into  single string
 		self.messageLog = ""
 		for row in messagesResult:
 			if row['username']: self.messageLog += row['username'] + '>'
 			self.messageLog += row['message'] + '\n'
 
+		#display messageLog to the server terminal
 		print(self.messageLog)
 
 		#open log file
@@ -47,7 +50,7 @@ class ChatServer():
 
 	#initial server setup
 	def startServer(self, port):
-		#set up the listening socket
+		#start the listening socket
 		self.serverSocket.bind(('0.0.0.0', port))
 		self.serverSocket.listen(10)
 		print("The server has started.")
@@ -67,7 +70,6 @@ class ChatServer():
 					self.clients.add(connection)
 
 				else:
-
 					#otherwise it is a new message from a client
 					try:
 						if not connection:
@@ -81,7 +83,6 @@ class ChatServer():
 
 	#broadcast a message from the server
 	def broadcast(self, message):
-
 		#print to server terminal
 		print(message)
 
@@ -101,7 +102,6 @@ class ChatServer():
 
 	#writes the message to a file and the database and sends the message to all clients
 	def handleClientMessage(self, client):
-
 		#client sent a message
 		message = client.recv(1024).decode('utf-8')
 
@@ -115,6 +115,7 @@ class ChatServer():
 			self.broadcast(self.clientNames[client]+" has joined.")
 			return
 
+		#add the client name
 		signedMessage = self.clientNames[client]+'>'+message
 
 		#insert the message into the database
@@ -135,5 +136,6 @@ class ChatServer():
 		self.startServer(port)
 		self.handleInputs()
 
+#entry point
 if __name__ == "__main__":
 	ChatServer().runServer(8080)
