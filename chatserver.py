@@ -6,13 +6,15 @@ import sys
 import socket
 import select
 import sqlalchemy
+import threading
+import xlsxwriter
 
 class ChatServer():
 
 	#constructor
 	def __init__(self):
 		#connect to db
-		self.db = sqlalchemy.create_engine('sqlite:///chatroom.db')
+		self.db = sqlalchemy.create_engine('sqlite:///chatroom.db',connect_args={'check_same_thread': False})
 		self.dbConn = self.db.connect()
 
 		#turn off db logging
@@ -55,31 +57,90 @@ class ChatServer():
 		self.serverSocket.listen(10)
 		print("The server has started.")
 
+	#handle input written into the server terminal
+	def handleUserInput(self):
+		while True:
+			try:
+				message = input()
+
+				#stop the server on '/exit'
+				if message.lower() == '/exit':
+					self.serverSocket.close()
+					break
+
+				#export a csv file on '/csv'
+				elif message.split(' ')[0].lower() == '/spreadsheet':
+					self.exportSpreadsheet(message.split(' ')[-1] if len(message.split(' '))>1 else '')
+
+			except EOFError:
+				self.serverSocket.close()
+				break
+
+	#export the chat log as a csv file
+	def exportSpreadsheet(self, filename):
+		#default filename is 'chatlog'
+		filename = filename or 'chatlog'
+
+		#init the spreadsheet file and writer
+		workbook = xlsxwriter.Workbook(filename+'.xlsx')
+		worksheet = workbook.add_worksheet()
+		row = 0
+		usernameCol=0
+		messageCol=1
+
+		#define bold text for headers
+		bold = workbook.add_format({'bold': True})
+
+		#widen the columns
+		worksheet.set_column('A:A', 20)
+		worksheet.set_column('B:B', 50)
+
+		#pull the message from db
+		messagesResult = self.dbConn.execute(sqlalchemy.select([self.dbMessages]))
+
+		#write the headers
+		worksheet.write(0,usernameCol,'Username',bold)
+		worksheet.write(0,messageCol,'Message',bold)
+		row += 1
+
+		#write the db messages to the csv file
+		for message in messagesResult:
+			worksheet.write(row, usernameCol, message['username'])
+			worksheet.write(row, messageCol, message['message'])
+			row += 1
+
+		print('speadsheet exported as '+filename+'.xlsx')
+
 	#continuously handles inputs from clients as long as the server runs
-	def handleInputs(self):
+	def handleClientInput(self):
 		#accept connections in a loop
 		while True:
-			#wait for input
-			(readable, writable, errored) = select.select([self.serverSocket] + list(self.clients), [], [])
 
-			for connection in readable:
-				#the connection being the main socket means that there is a new client
-				if connection == self.serverSocket:
-					(connection, address) = self.serverSocket.accept()
-					connection.send(self.messageLog.encode('utf-8'))
-					self.clients.add(connection)
+			try:
+				#wait for input
+				(readable, writable, errored) = select.select([self.serverSocket] + list(self.clients), [], [])
 
-				else:
-					#otherwise it is a new message from a client
-					try:
-						if not connection:
-							raise ConnectionError()
-						self.handleClientMessage(connection)
+				for connection in readable:
+					#the connection being the main socket means that there is a new client
+					if connection == self.serverSocket:
+						(connection, address) = self.serverSocket.accept()
+						connection.send(self.messageLog.encode('utf-8'))
+						self.clients.add(connection)
 
-					#or the connection has been closed
-					except ConnectionError:
-						self.clients.remove(connection)
-						self.broadcast(self.clientNames[connection]+" disconnected.")
+					else:
+						#otherwise it is a new message from a client
+						try:
+							if not connection:
+								raise ConnectionError()
+							self.handleClientMessage(connection)
+
+						#or the connection has been closed
+						except ConnectionError:
+							self.clients.remove(connection)
+							self.broadcast(self.clientNames[connection]+" disconnected.")
+
+			except: break
+		print("The server has stopped")
 
 	#broadcast a message from the server
 	def broadcast(self, message):
@@ -134,7 +195,10 @@ class ChatServer():
 	#runs the server
 	def runServer(self, port):
 		self.startServer(port)
-		self.handleInputs()
+
+		#handle client and user inputs in separate threads
+		threading.Thread(target=self.handleUserInput).start()
+		self.handleClientInput()
 
 #entry point
 if __name__ == "__main__":

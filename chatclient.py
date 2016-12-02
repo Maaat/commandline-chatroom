@@ -40,7 +40,7 @@ class ChatClient():
 			message = input()
 
 			#exit if the user types 'exit'
-			if message == 'exit':
+			if message.split(' ')[0].lower() == '/exit':
 				self.serverSocket.close()
 				break
 				

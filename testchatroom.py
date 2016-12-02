@@ -9,6 +9,7 @@ import sqlalchemy.orm
 import threading
 import select
 import time
+import xlrd
 
 import chatserver
 import chatclient
@@ -54,6 +55,28 @@ class TestServer(unittest.TestCase):
 		self.assertIsNone(username)
 
 		server.serverSocket.close()
+
+	def testExportSpreadsheet(self):
+		#create a server
+		server = chatserver.ChatServer()
+
+		#create test message
+		testMessage = "test message from " + str(datetime.now())
+
+		#broadcast the message; there are no clients so it will just be persisted to the database and log file
+		server.broadcast(testMessage)
+
+		#export spreadsheet
+		server.exportSpreadsheet('test-spreadsheet')
+
+		#open the workbook and get the last last row's message field
+		workbook = xlrd.open_workbook('test-spreadsheet.xlsx')
+		sheet = workbook.sheet_by_index(0)
+		lastRow = sheet.row(sheet.nrows-1)
+		lastMessage = lastRow[1].value
+
+		#check if the test message is 
+		self.assertEqual(lastMessage, testMessage)
 
 class testClient(unittest.TestCase):
 
